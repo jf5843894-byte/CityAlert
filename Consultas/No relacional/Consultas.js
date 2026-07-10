@@ -249,27 +249,20 @@ db.comentarios.aggregate([
   }
 ])
 
-// 12. Mostrar los tipos de evidencia más usados
+// 12. Mostrar reportes que tienen evidencia de tipo jpg
 db.Reportes.aggregate([
   {
-    $unwind: "$evidencias"
-  },
-  {
-    $group: {
-      _id: "$evidencias.tipo",
-      total: { $sum: 1 }
+    $match: {
+      "evidencias.tipo": "jpg"
     }
   },
   {
     $project: {
       _id: 0,
-      tipo_evidencia: "$_id",
-      total: 1
-    }
-  },
-  {
-    $sort: {
-      total: -1
+      titulo: 1,
+      distrito: "$distrito.nombre_distrito",
+      estado: "$estado.nombre_estado",
+      tipo_evidencia: "jpg"
     }
   }
 ])
@@ -299,9 +292,6 @@ db.Reportes.aggregate([
 // 14. Mostrar reportes que tienen comentarios hechos por personal municipal
 db.Reportes.aggregate([
   {
-    $unwind: "$comentarios"
-  },
-  {
     $match: {
       "comentarios.usuario.nombre": {
         $in: [
@@ -317,9 +307,9 @@ db.Reportes.aggregate([
     $project: {
       _id: 0,
       titulo: 1,
-      comentario: "$comentarios.contenido",
-      autor_comentario: "$comentarios.usuario.nombre",
-      fecha_comentario: "$comentarios.fecha_comentario"
+      "comentarios.contenido": 1,
+      "comentarios.usuario.nombre": 1,
+      "comentarios.fecha_comentario": 1
     }
   }
 ])
