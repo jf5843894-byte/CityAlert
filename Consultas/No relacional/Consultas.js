@@ -1,81 +1,352 @@
 use("CityAlert")
 
-// ======================================================
-// CONSULTAS SIMPLES PARA CITYALERT
-// ======================================================
-
-// 1. Mostrar todos los reportes registrados en el sistema
-db.Reportes.find()
-
-// 2. Mostrar solo el titulo, estado y prioridad de cada reporte
-db.Reportes.find(
-  {},
+// 1. Contar cuántos reportes existen por estado
+db.Reportes.aggregate([
   {
-    titulo: 1,
-    "estado.nombre_estado": 1,
-    "prioridad.nivel": 1
+    $group: {
+      _id: "$estado.nombre_estado",
+      total_reportes: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      estado: "$_id",
+      total_reportes: 1
+    }
+  },
+  {
+    $sort: {
+      total_reportes: -1
+    }
   }
-)
+])
 
-// 3. Mostrar los reportes que estan en estado "Registrado"
-db.Reportes.find({
-  "estado.nombre_estado": "Registrado"
-})
-
-// 4. Mostrar los reportes que estan en estado "En revisión"
-db.Reportes.find({
-  "estado.nombre_estado": "En revisión"
-})
-
-// 5. Mostrar los reportes con prioridad alta o superior
-db.Reportes.find({
-  "prioridad.nivel": {
-    $in: ["Alta", "Muy alta", "Urgente", "Crítica", "Emergencia"]
+// 2. Contar cuántos reportes existen por distrito
+db.Reportes.aggregate([
+  {
+    $group: {
+      _id: "$distrito.nombre_distrito",
+      total_reportes: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      distrito: "$_id",
+      total_reportes: 1
+    }
+  },
+  {
+    $sort: {
+      total_reportes: -1
+    }
   }
-})
+])
 
-// 6. Mostrar los reportes del distrito de Santiago de Surco
-db.Reportes.find({
-  "distrito.nombre_distrito": "Santiago de Surco"
-})
+// 3. Mostrar cuántos reportes hay por categoría
+db.Reportes.aggregate([
+  {
+    $group: {
+      _id: "$categoria.nombre_categoria",
+      total_reportes: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      categoria: "$_id",
+      total_reportes: 1
+    }
+  },
+  {
+    $sort: {
+      total_reportes: -1
+    }
+  }
+])
 
-// 7. Mostrar los reportes creados por el usuario Carlos Bazan
-db.Reportes.find({
-  "usuario.nombre_usuario": "Carlos Bazan"
-})
+// 4. Mostrar cuántos reportes hizo cada usuario
+db.Reportes.aggregate([
+  {
+    $group: {
+      _id: "$usuario.nombre_usuario",
+      total_reportes: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      usuario: "$_id",
+      total_reportes: 1
+    }
+  },
+  {
+    $sort: {
+      total_reportes: -1
+    }
+  }
+])
 
-// 8. Contar la cantidad total de reportes registrados
-db.Reportes.countDocuments()
+// 5. Mostrar reportes con prioridad alta o superior
+db.Reportes.aggregate([
+  {
+    $match: {
+      "prioridad.nivel": {
+        $in: ["Alta", "Muy alta", "Urgente", "Crítica", "Emergencia"]
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      titulo: 1,
+      usuario: "$usuario.nombre_usuario",
+      distrito: "$distrito.nombre_distrito",
+      prioridad: "$prioridad.nivel",
+      estado: "$estado.nombre_estado"
+    }
+  }
+])
 
-// 9. Contar cuántos usuarios tienen rol de Ciudadano
-db.Usuario.countDocuments({
-  "rol.nombre_rol": "Ciudadano"
-})
+// 6. Mostrar reportes finalizados o derivados
+db.Reportes.aggregate([
+  {
+    $match: {
+      "estado.nombre_estado": {
+        $in: ["Resuelto", "Cerrado", "Derivado"]
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      titulo: 1,
+      estado: "$estado.nombre_estado",
+      distrito: "$distrito.nombre_distrito",
+      fecha_reporte: 1
+    }
+  },
+  {
+    $sort: {
+      fecha_reporte: -1
+    }
+  }
+])
 
-// 10. Contar cuántos usuarios tienen rol de Personal Municipal
-db.Usuario.countDocuments({
-  "rol.nombre_rol": "Personal Municipal"
-})
+// 7. Mostrar reportes pendientes de atención
+db.Reportes.aggregate([
+  {
+    $match: {
+      "estado.nombre_estado": {
+        $in: ["Registrado", "En revisión", "Asignado", "En proceso", "Observado", "Reabierto"]
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      titulo: 1,
+      estado: "$estado.nombre_estado",
+      prioridad: "$prioridad.nivel",
+      distrito: "$distrito.nombre_distrito"
+    }
+  }
+])
 
-// 11. Mostrar todos los reportes ordenados del mas reciente al mas antiguo
-db.Reportes.find().sort({
-  fecha_reporte: -1
-})
+// 8. Contar usuarios por rol
+db.Usuario.aggregate([
+  {
+    $group: {
+      _id: "$rol.nombre_rol",
+      total_usuarios: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      rol: "$_id",
+      total_usuarios: 1
+    }
+  },
+  {
+    $sort: {
+      total_usuarios: -1
+    }
+  }
+])
 
-// 12. Mostrar solo los 5 reportes mas recientes
-db.Reportes.find().sort({
-  fecha_reporte: -1
-}).limit(5)
+// 9. Mostrar distritos con reportes de prioridad muy alta o más
+db.Reportes.aggregate([
+  {
+    $match: {
+      "prioridad.nivel": {
+        $in: ["Muy alta", "Urgente", "Crítica", "Emergencia"]
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$distrito.nombre_distrito",
+      total_reportes_criticos: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      distrito: "$_id",
+      total_reportes_criticos: 1
+    }
+  },
+  {
+    $sort: {
+      total_reportes_criticos: -1
+    }
+  }
+])
 
-// 13. Mostrar los reportes que tienen al menos un comentario
-db.Reportes.find({
-  "comentarios.0": { $exists: true }
-})
+// 10. Contar cuántos comentarios tiene cada reporte
+db.comentarios.aggregate([
+  {
+    $group: {
+      _id: "$id_reporte",
+      total_comentarios: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      id_reporte: "$_id",
+      total_comentarios: 1
+    }
+  },
+  {
+    $sort: {
+      total_comentarios: -1
+    }
+  }
+])
 
-// 14. Mostrar todos los comentarios guardados en la coleccion comentarios
-db.comentarios.find()
+// 11. Mostrar qué usuarios comentaron más veces
+db.comentarios.aggregate([
+  {
+    $group: {
+      _id: "$usuario.nombre",
+      total_comentarios: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      usuario: "$_id",
+      total_comentarios: 1
+    }
+  },
+  {
+    $sort: {
+      total_comentarios: -1
+    }
+  }
+])
 
-// 15. Mostrar los reportes que tienen evidencias de tipo jpg
-db.Reportes.find({
-  "evidencias.tipo": "jpg"
-})
+// 12. Mostrar los tipos de evidencia más usados
+db.Reportes.aggregate([
+  {
+    $unwind: "$evidencias"
+  },
+  {
+    $group: {
+      _id: "$evidencias.tipo",
+      total: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      tipo_evidencia: "$_id",
+      total: 1
+    }
+  },
+  {
+    $sort: {
+      total: -1
+    }
+  }
+])
+
+// 13. Mostrar los 5 reportes más recientes con sus datos principales
+db.Reportes.aggregate([
+  {
+    $sort: {
+      fecha_reporte: -1
+    }
+  },
+  {
+    $limit: 5
+  },
+  {
+    $project: {
+      _id: 0,
+      titulo: 1,
+      fecha_reporte: 1,
+      usuario: "$usuario.nombre_usuario",
+      distrito: "$distrito.nombre_distrito",
+      estado: "$estado.nombre_estado"
+    }
+  }
+])
+
+// 14. Mostrar reportes que tienen comentarios hechos por personal municipal
+db.Reportes.aggregate([
+  {
+    $unwind: "$comentarios"
+  },
+  {
+    $match: {
+      "comentarios.usuario.nombre": {
+        $in: [
+          "Juan Elias Villafuerte",
+          "Mariela Torres",
+          "Luis Ramirez",
+          "Andrea Paredes"
+        ]
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      titulo: 1,
+      comentario: "$comentarios.contenido",
+      autor_comentario: "$comentarios.usuario.nombre",
+      fecha_comentario: "$comentarios.fecha_comentario"
+    }
+  }
+])
+
+// 15. Mostrar cantidad de reportes por combinación de estado y prioridad
+db.Reportes.aggregate([
+  {
+    $group: {
+      _id: {
+        estado: "$estado.nombre_estado",
+        prioridad: "$prioridad.nivel"
+      },
+      total: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      estado: "$_id.estado",
+      prioridad: "$_id.prioridad",
+      total: 1
+    }
+  },
+  {
+    $sort: {
+      estado: 1,
+      prioridad: 1
+    }
+  }
+])
